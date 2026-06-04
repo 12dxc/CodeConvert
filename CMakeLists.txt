@@ -65,8 +65,8 @@ set(UI_FILES
     src/mainwindow.ui
 )
 
-# 创建可执行文件
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})
+# 创建可执行文件（WIN32 表示 Windows GUI 程序，不显示控制台窗口）
+add_executable(${PROJECT_NAME} WIN32 ${SOURCES} ${HEADERS} ${UI_FILES})
 
 # 链接库
 target_link_libraries(${PROJECT_NAME} PRIVATE
