@@ -1,0 +1,48 @@
+# Build directories
+build/
+cmake-build-*/
+_deps/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache files
+.cache/
+.cache/clangd/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CMakeLists.txt.user
+compile_commands.json
+
+# Compiled objects
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Qt generated files
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+*.moc
+
+# MSYS2/MinGW
+*.d
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# OS generated files
+.DS_Store
+Thumbs.db
