@@ -35,7 +35,9 @@ void Worker::process()
     if (m_isFolderMode) {
         exploreFolder(m_path);
     } else {
+        emit totalCount(1);
         convertFile(m_path);
+        emit progressChanged(1);
     }
 
     emit logMessage("处理完成!");
@@ -143,15 +145,29 @@ void Worker::exploreFolder(const QString &dirPath)
 
     // 遍历文件夹
     QDirIterator it(dirPath, filters, flags);
+
+    // 第一遍计数，用于进度条
+    int total = 0;
     while (it.hasNext()) {
         it.next();
+        if (shouldProcessSuffix(it.fileInfo().suffix().toLower())) {
+            ++total;
+        }
+    }
+    emit totalCount(total);
 
-        QString filePath = it.filePath();
-        QString suffix = it.fileInfo().suffix().toLower();
+    // 第二遍正式处理
+    QDirIterator it2(dirPath, filters, flags);
+    int current = 0;
+    while (it2.hasNext()) {
+        it2.next();
 
-        // 检查文件后缀
+        QString filePath = it2.filePath();
+        QString suffix = it2.fileInfo().suffix().toLower();
+
         if (shouldProcessSuffix(suffix)) {
             convertFile(filePath);
+            emit progressChanged(++current);
         }
     }
 }

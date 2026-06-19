@@ -363,22 +363,25 @@
        </layout>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_6">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_6">
+         <item>
+          <widget class="QPushButton" name="btnTransmit">
+           <property name="text">
+            <string>转换</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnClear">
+           <property name="text">
+            <string>清屏</string>
+           </property>
+          </widget>
+         </item>
           <item>
-           <widget class="QPushButton" name="btnTransmit">
-            <property name="text">
-             <string>转换</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnClear">
-            <property name="text">
-             <string>清屏</string>
-            </property>
-           </widget>
+           <widget class="QComboBox" name="comboBoxFilter"/>
           </item>
           <item>
            <spacer name="horizontalSpacer_3">
@@ -393,38 +396,48 @@
             </property>
            </spacer>
           </item>
-         </layout>
-        </item>
+        </layout>
+       </item>
         <item>
-         <widget class="QTableWidget" name="tableWidget">
-          <column>
-           <property name="text">
-            <string>文件名</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>识别类型</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>解码方法</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>结果</string>
-           </property>
-          </column>
+         <widget class="QProgressBar" name="progressBar">
+          <property name="value">
+           <number>0</number>
+          </property>
          </widget>
         </item>
-       </layout>
+        <item>
+         <widget class="QSplitter" name="splitter">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <widget class="QTableWidget" name="tableWidget">
+           <column>
+            <property name="text">
+             <string>文件名</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>识别类型</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>解码方法</string>
+            </property>
+           </column>
+           <column>
+            <property name="text">
+             <string>结果</string>
+            </property>
+           </column>
+          </widget>
+          <widget class="QTextBrowser" name="textBrowser"/>
+         </widget>
+        </item>
+      </layout>
       </item>
      </layout>
-    </item>
-    <item>
-     <widget class="QTextBrowser" name="textBrowser"/>
     </item>
    </layout>
   </widget>

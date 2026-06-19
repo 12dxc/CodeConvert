@@ -6,6 +6,8 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QGroupBox>
+#include <QUrl>
+#include <QFileInfo>
 
 // 内置文件后缀
 const QStringList MainWindow::BUILTIN_SUFFIXES = {".c", ".h", ".cpp", ".hpp", ".txt", ".bat", ".py", ".java"};
@@ -16,8 +18,10 @@ MainWindow::MainWindow(QWidget *parent)
     , workerThread(nullptr)
     , worker(nullptr)
     , isFolderMode(false)
+    , m_processedCount(0)
 {
     ui->setupUi(this);
+    setAcceptDrops(true);
     initForm();
     connectSlots();
 
@@ -47,6 +51,24 @@ void MainWindow::initForm()
     ui->tableWidget->setColumnWidth(1, 70);
     ui->tableWidget->setColumnWidth(2, 70);
     ui->tableWidget->setColumnWidth(3, 70);
+
+    // 表格排序
+    ui->tableWidget->setSortingEnabled(true);
+
+    // 进度条
+    ui->progressBar->setRange(0, 100);
+    ui->progressBar->setValue(0);
+    ui->progressBar->setFormat("%v / %m");
+
+    // 筛选下拉框
+    ui->comboBoxFilter->addItem("全部");
+    ui->comboBoxFilter->addItem("仅成功");
+    ui->comboBoxFilter->addItem("仅失败");
+
+    // QSplitter：上下分割表格区域和日志区域
+    ui->splitter->setOrientation(Qt::Vertical);
+    ui->splitter->setStretchFactor(0, 3);  // 上部表格区域占更多空间
+    ui->splitter->setStretchFactor(1, 1);  // 下部日志区域占较少空间
 
     // 设置默认选中的文件类型
     ui->cbCFile->setChecked(true);
@@ -79,6 +101,10 @@ void MainWindow::connectSlots()
     for (QCheckBox *checkBox : checkBoxes) {
         connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onFileTypeChanged);
     }
+
+    // 连接筛选下拉框
+    connect(ui->comboBoxFilter, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onFilterChanged);
 }
 
 void MainWindow::onOpenFileClicked()
@@ -110,6 +136,7 @@ void MainWindow::onBtnClearClicked()
     ui->textBrowser->clear();
     ui->tableWidget->clearContents();
     ui->tableWidget->setRowCount(0);
+    ui->progressBar->setValue(0);
 }
 
 void MainWindow::onCbEncodeIndexChanged(int index)
@@ -203,6 +230,10 @@ void MainWindow::onTransmitClicked()
     // 禁用控件
     setWidgetsEnabled(false);
 
+    // 重置进度条
+    ui->progressBar->setValue(0);
+    m_processedCount = 0;
+
     // 创建工作线程
     workerThread = new QThread(this);
     worker = new Worker();
@@ -214,6 +245,8 @@ void MainWindow::onTransmitClicked()
     connect(worker, &Worker::finished, this, &MainWindow::onWorkerFinished);
     connect(worker, &Worker::progressUpdate, this, &MainWindow::onProgressUpdate);
     connect(worker, &Worker::logMessage, this, &MainWindow::onLogMessage);
+    connect(worker, &Worker::totalCount, this, &MainWindow::onTotalCount);
+    connect(worker, &Worker::progressChanged, this, &MainWindow::onProgressChanged);
     connect(worker, &Worker::finished, workerThread, &QThread::quit);
     connect(workerThread, &QThread::finished, worker, &Worker::deleteLater);
     connect(workerThread, &QThread::finished, workerThread, &QThread::deleteLater);
@@ -249,6 +282,7 @@ void MainWindow::onLogMessage(const QString &message)
 void MainWindow::onWorkerFinished()
 {
     setWidgetsEnabled(true);
+    ui->progressBar->setValue(ui->progressBar->maximum());
     onLogMessage("处理完成!");
 }
 
@@ -278,4 +312,75 @@ QString MainWindow::getTargetEncoding() const
     }
 
     return "UTF-8 BOM";  // 默认返回 UTF-8 BOM
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+    const QMimeData *mimeData = event->mimeData();
+    if (!mimeData->hasUrls()) {
+        return;
+    }
+
+    QList<QUrl> urls = mimeData->urls();
+    if (urls.isEmpty()) {
+        return;
+    }
+
+    QString path = urls.first().toLocalFile();
+    QFileInfo fi(path);
+
+    if (fi.isDir()) {
+        currentPath = path;
+        isFolderMode = true;
+        ui->labelPath->setText(path);
+    } else if (fi.isFile()) {
+        currentPath = path;
+        isFolderMode = false;
+        ui->labelPath->setText(path);
+    }
+}
+
+void MainWindow::onTotalCount(int total)
+{
+    ui->progressBar->setRange(0, total);
+    ui->progressBar->setValue(0);
+}
+
+void MainWindow::onProgressChanged(int current)
+{
+    ui->progressBar->setValue(current);
+}
+
+void MainWindow::onFilterChanged(int index)
+{
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        QTableWidgetItem *resultItem = ui->tableWidget->item(row, 3);
+        if (!resultItem) {
+            continue;
+        }
+
+        QString result = resultItem->text();
+        bool show = false;
+
+        switch (index) {
+        case 0:  // 全部
+            show = true;
+            break;
+        case 1:  // 仅成功
+            show = result.contains("成功");
+            break;
+        case 2:  // 仅失败
+            show = result.contains("失败") || result.contains("跳过");
+            break;
+        }
+
+        ui->tableWidget->setRowHidden(row, !show);
+    }
 }

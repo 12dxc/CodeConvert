@@ -4,6 +4,9 @@
 #include <QMainWindow>
 #include <QThread>
 #include <QStringList>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -23,6 +26,17 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+protected:
+    /**
+     * @brief 拖拽进入事件
+     */
+    void dragEnterEvent(QDragEnterEvent *event) override;
+
+    /**
+     * @brief 拖放事件
+     */
+    void dropEvent(QDropEvent *event) override;
 
 private slots:
     /**
@@ -83,6 +97,24 @@ private slots:
      */
     void onWorkerFinished();
 
+    /**
+     * @brief 接收文件总数
+     * @param total 待处理文件总数
+     */
+    void onTotalCount(int total);
+
+    /**
+     * @brief 接收当前进度
+     * @param current 已处理文件数
+     */
+    void onProgressChanged(int current);
+
+    /**
+     * @brief 筛选下拉框改变事件
+     * @param index 选中的索引
+     */
+    void onFilterChanged(int index);
+
 private:
     /**
      * @brief 初始化界面
@@ -119,6 +151,7 @@ private:
     QStringList fileSuffixes;    ///< 内置文件后缀列表
     QStringList customFileSuffixes;  ///< 自定义文件后缀列表
     bool isFolderMode;           ///< 是否为文件夹模式
+    int m_processedCount;        ///< 已处理文件数（进度条用）
 
     // 内置文件后缀
     static const QStringList BUILTIN_SUFFIXES;

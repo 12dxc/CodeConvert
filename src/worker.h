@@ -60,6 +60,18 @@ signals:
      */
     void finished();
 
+    /**
+     * @brief 文件总数信号（进度条用）
+     * @param total 待处理文件总数
+     */
+    void totalCount(int total);
+
+    /**
+     * @brief 当前已处理数量信号
+     * @param current 已处理文件数
+     */
+    void progressChanged(int current);
+
 private:
     /**
      * @brief 转换单个文件的编码
