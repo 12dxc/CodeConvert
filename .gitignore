@@ -1,11 +1,18 @@
 # Build directories
 build/
+build-release/
 cmake-build-*/
 _deps/
+
+# Packaging outputs
+dist/
+CodeConvert-Portable.exe
+package.7z
 
 # IDE files
 .vscode/
 .idea/
+.video_agent/
 *.swp
 *.swo
 *~
