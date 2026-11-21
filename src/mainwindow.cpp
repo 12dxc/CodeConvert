@@ -9,8 +9,8 @@
 #include <QUrl>
 #include <QFileInfo>
 
-// 内置文件后缀
-const QStringList MainWindow::BUILTIN_SUFFIXES = {".c", ".h", ".cpp", ".hpp", ".txt", ".bat", ".py", ".java"};
+// 目标编码列表（顺序必须与 mainwindow.ui 中 comboBox 的条目一致）
+const QStringList MainWindow::kTargetEncodings = {"UTF-8 BOM", "UTF-8", "GB2312"};
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -18,7 +18,6 @@ MainWindow::MainWindow(QWidget *parent)
     , workerThread(nullptr)
     , worker(nullptr)
     , isFolderMode(false)
-    , m_processedCount(0)
 {
     ui->setupUi(this);
     setAcceptDrops(true);
@@ -96,11 +95,18 @@ void MainWindow::connectSlots()
     connect(ui->comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &MainWindow::onCbEncodeIndexChanged);
 
-    // 连接文件类型复选框信号槽
+    // 连接文件类型复选框信号槽（Qt 6.9 起 stateChanged 已弃用）
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    QList<QCheckBox*> checkBoxes = ui->groupBox->findChildren<QCheckBox*>();
+    for (QCheckBox *checkBox : checkBoxes) {
+        connect(checkBox, &QCheckBox::checkStateChanged, this, &MainWindow::onFileTypeChanged);
+    }
+#else
     QList<QCheckBox*> checkBoxes = ui->groupBox->findChildren<QCheckBox*>();
     for (QCheckBox *checkBox : checkBoxes) {
         connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onFileTypeChanged);
     }
+#endif
 
     // 连接筛选下拉框
     connect(ui->comboBoxFilter, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -142,9 +148,8 @@ void MainWindow::onBtnClearClicked()
 void MainWindow::onCbEncodeIndexChanged(int index)
 {
     // 编码类型改变时的处理
-    QStringList encodeTypes = {"UTF-8 BOM", "UTF-8", "GB2312"};
-    if (index >= 0 && index < encodeTypes.size()) {
-        onLogMessage(QString("设置编码类型: %1").arg(encodeTypes[index]));
+    if (index >= 0 && index < kTargetEncodings.size()) {
+        onLogMessage(QString("设置编码类型: %1").arg(kTargetEncodings[index]));
     }
 }
 
@@ -214,9 +219,10 @@ void MainWindow::onTransmitClicked()
         return;
     }
 
-    // 清空结果表格
+    // 清空结果表格（处理期间关闭排序，避免按行号插入时被自动重排导致错位）
     ui->tableWidget->clearContents();
     ui->tableWidget->setRowCount(0);
+    ui->tableWidget->setSortingEnabled(false);
 
     // 获取文件后缀列表
     QStringList suffixes = getFileSuffixes();
@@ -232,7 +238,6 @@ void MainWindow::onTransmitClicked()
 
     // 重置进度条
     ui->progressBar->setValue(0);
-    m_processedCount = 0;
 
     // 创建工作线程
     workerThread = new QThread(this);
@@ -250,6 +255,9 @@ void MainWindow::onTransmitClicked()
     connect(worker, &Worker::finished, workerThread, &QThread::quit);
     connect(workerThread, &QThread::finished, worker, &Worker::deleteLater);
     connect(workerThread, &QThread::finished, workerThread, &QThread::deleteLater);
+    // 对象销毁后自动置空成员指针，避免析构时访问悬空指针
+    connect(workerThread, &QThread::destroyed, this, [this]() { workerThread = nullptr; });
+    connect(worker, &Worker::destroyed, this, [this]() { worker = nullptr; });
 
     // 启动线程
     workerThread->start();
@@ -283,7 +291,7 @@ void MainWindow::onWorkerFinished()
 {
     setWidgetsEnabled(true);
     ui->progressBar->setValue(ui->progressBar->maximum());
-    onLogMessage("处理完成!");
+    ui->tableWidget->setSortingEnabled(true);
 }
 
 void MainWindow::setWidgetsEnabled(bool enabled)
@@ -304,11 +312,10 @@ QStringList MainWindow::getFileSuffixes() const
 
 QString MainWindow::getTargetEncoding() const
 {
-    QStringList encodeTypes = {"UTF-8 BOM", "UTF-8", "GB2312"};
     int index = ui->comboBox->currentIndex();
 
-    if (index >= 0 && index < encodeTypes.size()) {
-        return encodeTypes[index];
+    if (index >= 0 && index < kTargetEncodings.size()) {
+        return kTargetEncodings[index];
     }
 
     return "UTF-8 BOM";  // 默认返回 UTF-8 BOM
@@ -331,6 +338,11 @@ void MainWindow::dropEvent(QDropEvent *event)
     QList<QUrl> urls = mimeData->urls();
     if (urls.isEmpty()) {
         return;
+    }
+
+    // 当前只支持单个路径，多文件拖入时提示
+    if (urls.size() > 1) {
+        ui->textBrowser->append(QString("提示: 拖入了 %1 个路径，仅处理第一个").arg(urls.size()));
     }
 
     QString path = urls.first().toLocalFile();

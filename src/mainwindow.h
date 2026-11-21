@@ -151,10 +151,9 @@ private:
     QStringList fileSuffixes;    ///< 内置文件后缀列表
     QStringList customFileSuffixes;  ///< 自定义文件后缀列表
     bool isFolderMode;           ///< 是否为文件夹模式
-    int m_processedCount;        ///< 已处理文件数（进度条用）
 
-    // 内置文件后缀
-    static const QStringList BUILTIN_SUFFIXES;
+    // 目标编码列表（顺序必须与 mainwindow.ui 中 comboBox 的条目一致）
+    static const QStringList kTargetEncodings;
 };
 
 #endif // MAINWINDOW_H
