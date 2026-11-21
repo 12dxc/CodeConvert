@@ -1,0 +1,5 @@
+// 由 CMake configure_file 从本模板生成，请勿直接修改生成的 version.h
+// 版本号唯一来源：CMakeLists.txt 中的 project(VERSION)
+#pragma once
+
+#define CODECONVERT_VERSION "@PROJECT_VERSION@"
