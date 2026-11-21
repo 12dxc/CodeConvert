@@ -8,6 +8,7 @@
 
 // Qt6 中 QTextCodec 被移到 qt5compat 模块
 #include <QTextCodec>
+#include <QSaveFile>
 
 Worker::Worker(QObject *parent)
     : QObject(parent)
@@ -75,20 +76,29 @@ void Worker::convertFile(const QString &filePath)
         return;
     }
 
-    // 检查是否需要转换
-    QString targetCodecName = getTargetCodecName();
-    if (sourceEncoding.toUpper() == targetCodecName.toUpper() ||
-        (sourceEncoding.toUpper() == "UTF-8" && m_targetEncoding.toUpper() == "UTF-8")) {
+    // 检查是否需要转换（比较规范化的编码名，区分 UTF-8 与 UTF-8 BOM）
+    // detect() 返回的源编码与 UI 传入的目标编码都是规范化名称
+    if (sourceEncoding.compare(m_targetEncoding, Qt::CaseInsensitive) == 0) {
         emit logMessage(QString("此文件格式无需转换: %1").arg(filePath));
+        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "跳过");
         return;
     }
 
+    // 获取目标编码对应的 Qt 编码名
+    QString targetCodecName = getTargetCodecName();
+
+    // 源编码统一映射为 Qt 编码名："UTF-8 BOM" 用 UTF-8 编解码器解码，
+    // Qt 会自动剥离文件头 BOM
+    QString sourceCodecName = (sourceEncoding.compare("UTF-8 BOM", Qt::CaseInsensitive) == 0)
+                                  ? QStringLiteral("UTF-8")
+                                  : sourceEncoding;
+
     // 获取编解码器
-    QTextCodec *sourceCodec = QTextCodec::codecForName(sourceEncoding.toLatin1());
+    QTextCodec *sourceCodec = QTextCodec::codecForName(sourceCodecName.toLatin1());
     QTextCodec *targetCodec = QTextCodec::codecForName(targetCodecName.toLatin1());
 
     if (!sourceCodec) {
-        emit logMessage(QString("不支持的源编码: %1 (%2)").arg(sourceEncoding, filePath));
+        emit logMessage(QString("不支持的源编码: %1 (%2)").arg(sourceCodecName, filePath));
         emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, "", "转换失败");
         return;
     }
@@ -106,29 +116,55 @@ void Worker::convertFile(const QString &filePath)
     // 检查解码是否成功
     if (decoder.hasFailure()) {
         emit logMessage(QString("解码失败: %1 (编码: %2)").arg(filePath, sourceEncoding));
-        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, targetCodecName, "解码失败");
+        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "解码失败");
         return;
     }
 
+    // Qt 的 UTF-8 解码器会自动剥离文件头 BOM；
+    // UTF-16 LE/BE 编解码器不会剥离，而 detect() 返回 UTF-16LE/BE 时文件必有 BOM，需手动剥离
+    if ((sourceEncoding == "UTF-16LE" || sourceEncoding == "UTF-16BE") &&
+        unicodeText.startsWith(QChar(0xFEFF))) {
+        unicodeText.remove(0, 1);
+    }
+
     // 编码为目标格式
-    QTextEncoder encoder(targetCodec);
+    // IgnoreHeader：Qt6 的 UTF-8 编码器会自动前置 BOM，
+    // 统一禁用后由 addBom 按目标编码显式控制，避免双 BOM
+    QTextEncoder encoder(targetCodec, QTextCodec::IgnoreHeader);
     QByteArray targetContent = encoder.fromUnicode(unicodeText);
+
+    // 检查是否存在无法转换的字符（如 emoji 转为 GB2312 时会被静默丢弃）
+    bool encodeHasFailure = encoder.hasFailure();
 
     // 添加 BOM (如果是 UTF-8 BOM)
     targetContent = addBom(targetContent, m_targetEncoding);
 
-    // 写入文件
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    // 写入文件（QSaveFile 先写临时文件，commit 时原子替换，
+    // 避免转换中途失败或误判编码时直接损坏原文件）
+    QSaveFile saveFile(filePath);
+    if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         emit logMessage(QString("无法写入文件: %1").arg(filePath));
-        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, targetCodecName, "写入失败");
+        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "写入失败");
         return;
     }
 
-    file.write(targetContent);
-    file.close();
+    saveFile.write(targetContent);
 
-    emit logMessage(QString("转换成功: %1 (%2 -> %3)").arg(filePath, sourceEncoding, targetCodecName));
-    emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, targetCodecName, "成功");
+    if (!saveFile.commit()) {
+        emit logMessage(QString("写入文件失败: %1 (%2)").arg(filePath, saveFile.errorString()));
+        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "写入失败");
+        return;
+    }
+
+    if (encodeHasFailure) {
+        emit logMessage(QString("转换完成但存在无法转换的字符: %1 (%2 -> %3)")
+                            .arg(filePath, sourceEncoding, m_targetEncoding));
+        emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "成功 (存在无法转换的字符)");
+        return;
+    }
+
+    emit logMessage(QString("转换成功: %1 (%2 -> %3)").arg(filePath, sourceEncoding, m_targetEncoding));
+    emit progressUpdate(QFileInfo(filePath).fileName(), sourceEncoding, m_targetEncoding, "成功");
 }
 
 void Worker::exploreFolder(const QString &dirPath)
