@@ -22,16 +22,9 @@ public:
     /**
      * @brief 检测数据的编码格式
      * @param data 待检测的数据
-     * @return 检测到的编码名称（如 "UTF-8", "GB2312" 等），检测失败返回空字符串
+     * @return 检测到的编码名称（如 "UTF-8 BOM", "UTF-8", "GB18030" 等），检测失败返回空字符串
      */
     QString detect(const QByteArray &data);
-
-    /**
-     * @brief 检测数据是否为 UTF-8 编码
-     * @param data 待检测的数据
-     * @return 如果是 UTF-8 编码返回 true
-     */
-    bool isUtf8(const QByteArray &data);
 
     /**
      * @brief 检测数据是否包含 UTF-8 BOM
