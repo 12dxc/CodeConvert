@@ -35,6 +35,10 @@ else()
     # uchardet v0.0.8 的 CMakeLists.txt 声明的最低版本低于 3.5，
     # 新版 CMake 已移除兼容性，需临时放开限制
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    # 关闭 uchardet 自带的 CLI 工具（需要 MSVC 缺失的 getopt.h），
+    # 并统一用静态库，使其自带测试目标也能正确链接
+    set(BUILD_BINARY OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(uchardet)
     unset(CMAKE_POLICY_VERSION_MINIMUM)
 
