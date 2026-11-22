@@ -8,7 +8,8 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    # windows-2025 新镜像与 install-qt-action v4 不兼容（python 探测失败导致 Action not built）
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
